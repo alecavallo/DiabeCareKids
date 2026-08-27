@@ -4,4 +4,9 @@
     <cache-path
         name="meal_photos"
         path="meal_photos/" />
+
+    <!-- Generated clinical PDF reports (CAP-004, AndroidPdfReportExporter). -->
+    <cache-path
+        name="pdf_exports"
+        path="pdf_exports/" />
 </paths>

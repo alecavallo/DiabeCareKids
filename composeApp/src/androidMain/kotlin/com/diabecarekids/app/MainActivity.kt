@@ -10,6 +10,8 @@ import com.diabecarekids.app.alarm.WorkManagerAlarmScheduler
 import com.diabecarekids.app.alarm.WorkManagerMealReminderScheduler
 import com.diabecarekids.app.domain.LocalTimeOfDay
 import com.diabecarekids.app.domain.ReminderScheduleEngine
+import com.diabecarekids.app.export.AndroidPdfReportExporter
+import com.diabecarekids.app.export.AndroidReportShareLauncher
 import com.diabecarekids.app.navigation.AppGraph
 import com.diabecarekids.app.nutrition.ApiConfig
 import com.diabecarekids.app.nutrition.CarbResolutionEngineImpl
@@ -72,6 +74,8 @@ class MainActivity : ComponentActivity() {
             locationProvider = locationProvider,
             haptics = haptics,
             locationPermission = locationProvider,
+            pdfExporter = AndroidPdfReportExporter(applicationContext),
+            reportShareLauncher = AndroidReportShareLauncher(this),
             scope = scope,
         )
     }

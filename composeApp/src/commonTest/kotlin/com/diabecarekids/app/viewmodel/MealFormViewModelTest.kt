@@ -6,6 +6,7 @@ import com.diabecarekids.app.domain.CarbSource
 import com.diabecarekids.app.domain.FoodItem
 import com.diabecarekids.app.domain.RegistroComida
 import com.diabecarekids.app.domain.TipoComida
+import com.diabecarekids.app.format.formatGrams
 import com.diabecarekids.app.nutrition.CarbResolution
 import com.diabecarekids.app.nutrition.NutritionRepository
 import kotlinx.coroutines.CompletableDeferred
@@ -274,10 +275,10 @@ class MealFormViewModelTest {
 
     @Test
     fun formatGramsRoundsToOneDecimal() {
-        assertEquals("19.4", com.diabecarekids.app.ui.formatGrams(19.413999999999998), "float artifact must round to 1 decimal (ID-ROUND)")
-        assertEquals("27", com.diabecarekids.app.ui.formatGrams(27.0))
-        assertEquals("50", com.diabecarekids.app.ui.formatGrams(50.0))
-        assertEquals("40", com.diabecarekids.app.ui.formatGrams(40.0))
+        assertEquals("19.4", formatGrams(19.413999999999998), "float artifact must round to 1 decimal (ID-ROUND)")
+        assertEquals("27", formatGrams(27.0))
+        assertEquals("50", formatGrams(50.0))
+        assertEquals("40", formatGrams(40.0))
     }
 }
 
