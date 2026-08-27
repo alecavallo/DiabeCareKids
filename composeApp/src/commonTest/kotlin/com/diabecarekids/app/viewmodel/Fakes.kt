@@ -36,6 +36,7 @@ class FakePersistenceStore : PersistenceStore {
         saved.removeAll { it.id == id }
         updated.removeAll { it.id == id }
     }
+    override suspend fun getAll(): List<RegistroComida> = saved + updated
 }
 
 /** [PhotoCapture] stub. [uri] controls what [takePhoto] returns (null = cancel).
