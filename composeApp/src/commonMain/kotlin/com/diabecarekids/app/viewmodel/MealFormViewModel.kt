@@ -11,6 +11,7 @@ import com.diabecarekids.app.nutrition.CarbResolution
 import com.diabecarekids.app.nutrition.NutritionRepository
 import com.diabecarekids.app.platform.epochMillisNow
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -57,24 +58,40 @@ class MealFormViewModel(
     private val _savedMeal = MutableStateFlow<RegistroComida?>(null)
     val savedMeal: StateFlow<RegistroComida?> = _savedMeal.asStateFlow()
 
+    /** In-flight suggestion lookups, cancelled on keystroke/reset (ID-RACE, ID-RESET-CANCEL). */
+    private var suggestJob: Job? = null
+
+    /** In-flight carb-resolution work, cancelled on reset (ID-RESET-CANCEL). */
+    private var resolveJob: Job? = null
+
     /** Clears the "saved" signal once the UI has navigated. */
     fun onSavedMealConsumed() {
         _savedMeal.value = null
     }
 
-    /** Resets the form to a pristine state so the next meal starts clean (ID-LEAK). */
+    /** Resets the form to a pristine state so the next meal starts clean (ID-LEAK).
+     *  Cancels in-flight suggestion/resolution work so a slow response cannot
+     *  repopulate the fresh form (ID-RESET-CANCEL). */
     fun reset() {
+        suggestJob?.cancel()
+        resolveJob?.cancel()
+        suggestJob = null
+        resolveJob = null
         _state.value = MealFormState()
     }
 
     fun onFoodQueryChange(query: String) {
         _state.update { it.copy(foodQuery = query, error = null) }
+        // Only the latest query may drive suggestions; cancel the prior in-flight
+        // lookup so an out-of-order (stale) response never overwrites (ID-RACE).
+        suggestJob?.cancel()
         if (query.isBlank()) {
-            _state.update { it.copy(suggestions = emptyList()) }
+            suggestJob = null
+            _state.update { it.copy(suggestions = emptyList(), isResolving = false) }
             return
         }
         _state.update { it.copy(isResolving = true) }
-        scope.launch {
+        suggestJob = scope.launch {
             val suggestions = repository.suggestFoods(query.trim())
             _state.update { it.copy(suggestions = suggestions, isResolving = false) }
         }
@@ -103,7 +120,8 @@ class MealFormViewModel(
             return
         }
         _state.update { it.copy(isResolving = true, error = null) }
-        scope.launch {
+        resolveJob?.cancel()
+        resolveJob = scope.launch {
             when (val result = repository.resolveCarbs(query)) {
                 is CarbResolution.Resolved -> _state.update {
                     it.copy(
@@ -147,7 +165,8 @@ class MealFormViewModel(
         scope.launch {
             val uri = photoCapture.takePhoto()
             if (uri != null) {
-                _state.update { it.copy(photoUri = uri) }
+                // A successful capture clears any stale camera-denied error (ID-ERR-CLEAR).
+                _state.update { it.copy(photoUri = uri, error = null) }
             } else if (photoCapture.consumeCameraDenied()) {
                 _state.update { it.copy(error = CAMERA_DENIED_MESSAGE) }
             }

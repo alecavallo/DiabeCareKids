@@ -10,6 +10,7 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class FollowUpViewModelTest {
 
@@ -34,7 +35,7 @@ class FollowUpViewModelTest {
     @Test
     fun realCarbsAt80PercentOf50Is40() = runTest {
         val store = FakePersistenceStore()
-        val vm = FollowUpViewModel(store, FakePhotoCapture(), this, baseRegistro(estimados = 50.0))
+        val vm = FollowUpViewModel(store, FakePhotoCapture(), FakeAlarmScheduler(), this, baseRegistro(estimados = 50.0))
 
         vm.onIntakePercentChange(80)
         assertEquals(40.0, vm.state.value.realCarbsPreview, "80% of 50g must preview 40g (MEAL-003)")
@@ -52,7 +53,7 @@ class FollowUpViewModelTest {
     @Test
     fun saveWithoutPhotoKeepsFotoDespuesNull() = runTest {
         val store = FakePersistenceStore()
-        val vm = FollowUpViewModel(store, FakePhotoCapture(uri = null), this, baseRegistro())
+        val vm = FollowUpViewModel(store, FakePhotoCapture(uri = null), FakeAlarmScheduler(), this, baseRegistro())
 
         vm.onIntakePercentChange(100)
         vm.onBgPost2hChange("140")
@@ -67,7 +68,7 @@ class FollowUpViewModelTest {
     fun cancelledSecondCaptureKeepsExistingAfterPhoto() = runTest {
         val store = FakePersistenceStore()
         val photo = FakePhotoCapture()
-        val vm = FollowUpViewModel(store, photo, this, baseRegistro())
+        val vm = FollowUpViewModel(store, photo, FakeAlarmScheduler(), this, baseRegistro())
 
         photo.results.addAll(listOf("file://after.jpg", null)) // capture then cancel
         vm.takePhoto()
@@ -86,7 +87,7 @@ class FollowUpViewModelTest {
     @Test
     fun saveRequiresTwoHourBg() = runTest {
         val store = FakePersistenceStore()
-        val vm = FollowUpViewModel(store, FakePhotoCapture(), this, baseRegistro())
+        val vm = FollowUpViewModel(store, FakePhotoCapture(), FakeAlarmScheduler(), this, baseRegistro())
 
         vm.onIntakePercentChange(50)
         vm.save()
@@ -94,5 +95,43 @@ class FollowUpViewModelTest {
 
         assertEquals(true, vm.state.value.error != null)
         assertEquals(true, store.updated.isEmpty(), "must not persist T2 without 2h BG")
+    }
+
+    @Test
+    fun successfulCaptureAfterDenialClearsCameraDeniedError() = runTest {
+        val store = FakePersistenceStore()
+        val photo = FakePhotoCapture(uri = null)
+        val vm = FollowUpViewModel(store, photo, FakeAlarmScheduler(), this, baseRegistro())
+
+        // Deny: takePhoto returns null + denied flag set -> friendly error surfaces.
+        photo.markCameraDenied()
+        photo.results.addAll(listOf(null))
+        vm.takePhoto()
+        advanceUntilIdle()
+        assertTrue(vm.state.value.error != null, "denied camera permission must set the error")
+
+        // User grants permission and captures successfully -> stale error must clear (ID-ERR-CLEAR).
+        photo.results.addAll(listOf("file://granted.jpg"))
+        vm.takePhoto()
+        advanceUntilIdle()
+        assertNull(vm.state.value.error, "a successful capture must clear the camera-denied error")
+        assertEquals("file://granted.jpg", vm.state.value.photoUri)
+    }
+
+    @Test
+    fun completingT2CancelsScheduledAlarm() = runTest {
+        val store = FakePersistenceStore()
+        val alarm = FakeAlarmScheduler()
+        val vm = FollowUpViewModel(store, FakePhotoCapture(), alarm, this, baseRegistro())
+
+        vm.onBgPost2hChange("160")
+        vm.save()
+        advanceUntilIdle()
+
+        assertEquals(
+            listOf("meal-1"),
+            alarm.cancelled,
+            "completing T2 must cancel the scheduled 2h postprandial alarm (ID-ALARM-CANCEL)",
+        )
     }
 }

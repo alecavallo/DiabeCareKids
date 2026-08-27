@@ -160,6 +160,9 @@ private fun QuickBgSelector(current: String, onChange: (String) -> Unit) {
     }
 }
 
-@Composable
-internal fun formatGrams(value: Double): String =
-    if (value == value.toLong().toDouble()) value.toLong().toString() else value.toString()
+/** Formats a gram value for display, rounding to 1 decimal to avoid float
+ *  artifacts like 19.413999999999998 rendering as-is (ID-ROUND). */
+internal fun formatGrams(value: Double): String {
+    val rounded = kotlin.math.round(value * 10.0) / 10.0
+    return if (rounded == rounded.toLong().toDouble()) rounded.toLong().toString() else rounded.toString()
+}

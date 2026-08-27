@@ -41,6 +41,7 @@ class AppGraph(
         FollowUpViewModel(
             store = store,
             photoCapture = photoCapture,
+            alarmScheduler = alarmScheduler,
             scope = scope,
             registro = registro,
         )

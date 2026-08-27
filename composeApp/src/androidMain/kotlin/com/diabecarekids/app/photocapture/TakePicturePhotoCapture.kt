@@ -96,13 +96,19 @@ class TakePicturePhotoCapture(
 
     private suspend fun awaitCameraPermission(): Boolean {
         val launcher = permissionLauncher ?: return false
+        // A permission request may already be in flight (a concurrent takePhoto).
+        // Reuse it rather than replacing the deferred, which would leak the first
+        // awaiter's suspended coroutine (ID-CAM-CONCURRENT).
+        pendingPermission?.let { existing ->
+            return existing.await()
+        }
         val deferred = CompletableDeferred<Boolean>()
         pendingPermission = deferred
         launcher.launch(Manifest.permission.CAMERA)
         return try {
             deferred.await()
         } finally {
-            pendingPermission = null
+            if (pendingPermission === deferred) pendingPermission = null
         }
     }
 

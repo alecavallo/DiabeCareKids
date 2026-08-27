@@ -3,10 +3,14 @@
 package com.diabecarekids.app.viewmodel
 
 import com.diabecarekids.app.domain.CarbSource
+import com.diabecarekids.app.domain.FoodItem
 import com.diabecarekids.app.domain.RegistroComida
 import com.diabecarekids.app.domain.TipoComida
 import com.diabecarekids.app.nutrition.CarbResolution
+import com.diabecarekids.app.nutrition.NutritionRepository
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -195,5 +199,99 @@ class MealFormViewModelTest {
 
         assertEquals("Oatmeal", vm.state.value.foodQuery)
         assertEquals("27", vm.state.value.carbInput)
+    }
+
+    @Test
+    fun successfulCaptureAfterDenialClearsCameraDeniedError() = runTest {
+        val repo = FakeNutritionRepository()
+        val store = FakePersistenceStore()
+        val photo = FakePhotoCapture(uri = null)
+        val vm = MealFormViewModel(repo, store, photo, FakeAlarmScheduler(), this)
+
+        // Deny: takePhoto returns null + denied flag set -> friendly error surfaces.
+        photo.markCameraDenied()
+        photo.results.addAll(listOf(null))
+        vm.takePhoto()
+        advanceUntilIdle()
+        assertTrue(vm.state.value.error != null, "denied camera permission must set the error")
+
+        // User grants permission and captures successfully -> stale error must clear (ID-ERR-CLEAR).
+        photo.results.addAll(listOf("file://granted.jpg"))
+        vm.takePhoto()
+        advanceUntilIdle()
+        assertNull(vm.state.value.error, "a successful capture must clear the camera-denied error")
+        assertEquals("file://granted.jpg", vm.state.value.photoUri)
+    }
+
+    @Test
+    fun resetCancelsInFlightSuggestionWork() = runTest {
+        val repo = GatedSuggestRepository()
+        val store = FakePersistenceStore()
+        val vm = MealFormViewModel(repo, store, FakePhotoCapture(), FakeAlarmScheduler(), this)
+
+        // "slow" query starts an in-flight suggestion lookup suspended on the gate.
+        vm.onFoodQueryChange("slow")
+        runCurrent()
+        assertEquals(1, repo.calls, "the suggestion coroutine must have started")
+
+        vm.reset()
+        repo.gate.complete(Unit) // release the suspended response
+        advanceUntilIdle()
+
+        assertTrue(
+            vm.state.value.suggestions.isEmpty(),
+            "a stale suggestion response must not repopulate the form after reset (ID-RESET-CANCEL)",
+        )
+    }
+
+    @Test
+    fun staleSuggestionResponseCannotOverwriteNewerQuery() = runTest {
+        val repo = GatedSuggestRepository()
+        val store = FakePersistenceStore()
+        val vm = MealFormViewModel(repo, store, FakePhotoCapture(), FakeAlarmScheduler(), this)
+
+        // First keystroke ("slow") starts an in-flight lookup that suspends on the gate.
+        vm.onFoodQueryChange("slow")
+        runCurrent()
+        // Second keystroke ("slow2") cancels the stale lookup and resolves immediately.
+        vm.onFoodQueryChange("slow2")
+        advanceUntilIdle()
+        assertEquals(
+            listOf(FoodItem("Result-slow2", 5.0, CarbSource.USDA)),
+            vm.state.value.suggestions,
+            "the latest query must drive the suggestions",
+        )
+
+        // Release the stale "slow" response — it must NOT overwrite the newer list (ID-RACE).
+        repo.gate.complete(Unit)
+        advanceUntilIdle()
+        assertEquals(
+            listOf(FoodItem("Result-slow2", 5.0, CarbSource.USDA)),
+            vm.state.value.suggestions,
+            "a stale (out-of-order) response must not win over the latest query",
+        )
+    }
+
+    @Test
+    fun formatGramsRoundsToOneDecimal() {
+        assertEquals("19.4", com.diabecarekids.app.ui.formatGrams(19.413999999999998), "float artifact must round to 1 decimal (ID-ROUND)")
+        assertEquals("27", com.diabecarekids.app.ui.formatGrams(27.0))
+        assertEquals("50", com.diabecarekids.app.ui.formatGrams(50.0))
+        assertEquals("40", com.diabecarekids.app.ui.formatGrams(40.0))
+    }
+}
+
+/** [NutritionRepository] whose suggestion lookup for the "slow" query suspends on
+ *  a gate, letting tests control when an in-flight response completes. */
+private class GatedSuggestRepository : NutritionRepository {
+    val gate = CompletableDeferred<Unit>()
+    var calls = 0
+
+    override suspend fun resolveCarbs(query: String): CarbResolution = CarbResolution.ManualRequired
+
+    override suspend fun suggestFoods(query: String): List<FoodItem> {
+        calls++
+        if (query == "slow") gate.await()
+        return listOf(FoodItem("Result-$query", 5.0, CarbSource.USDA))
     }
 }

@@ -4,6 +4,7 @@ import com.diabecarekids.app.domain.RegistroComida
 import com.diabecarekids.app.domain.calcularCarbohidratosReales
 import com.diabecarekids.app.persistence.PersistenceStore
 import com.diabecarekids.app.platform.PhotoCapture
+import com.diabecarekids.app.platform.PostprandialAlarmScheduler
 import com.diabecarekids.app.platform.epochMillisNow
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -31,6 +32,7 @@ data class FollowUpState(
 class FollowUpViewModel(
     private val store: PersistenceStore,
     private val photoCapture: PhotoCapture,
+    private val alarmScheduler: PostprandialAlarmScheduler,
     private val scope: CoroutineScope,
     registro: RegistroComida,
 ) {
@@ -72,7 +74,8 @@ class FollowUpViewModel(
         scope.launch {
             val uri = photoCapture.takePhoto()
             if (uri != null) {
-                _state.update { it.copy(photoUri = uri) }
+                // A successful capture clears any stale camera-denied error (ID-ERR-CLEAR).
+                _state.update { it.copy(photoUri = uri, error = null) }
             } else if (photoCapture.consumeCameraDenied()) {
                 _state.update { it.copy(error = CAMERA_DENIED_MESSAGE) }
             }
@@ -98,6 +101,8 @@ class FollowUpViewModel(
                 ultima_modificacion = now,
             )
             store.update(updated)
+            // The 2h postprandial reminder is now moot once T2 is recorded (ID-ALARM-CANCEL).
+            alarmScheduler.cancel(updated.id)
             _completed.value = updated
             _state.update { it.copy(isSaving = false) }
         }
