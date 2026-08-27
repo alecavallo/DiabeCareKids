@@ -40,6 +40,10 @@ local.properties
 *.apk
 .idea/
 
+# Throwaway CI release keystore (never committed; job-scoped)
+*.keystore
+*.jks
+
 # Terraform
 .terraform/
 *.tfstate

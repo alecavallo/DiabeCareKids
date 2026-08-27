@@ -42,8 +42,10 @@ android {
         applicationId = "com.diabecarekids.app"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
-        versionCode = 1
-        versionName = "1.0"
+        // CI injects these via `-PversionCode`/`-PversionName` (see Makefile
+        // `assemble-release`). Safe defaults keep local/debug builds unchanged.
+        versionCode = (project.findProperty("versionCode") as? String)?.toIntOrNull() ?: 1
+        versionName = (project.findProperty("versionName") as? String) ?: "1.0"
     }
 
     packaging {
@@ -52,9 +54,24 @@ android {
         }
     }
 
+    // Opt-in release signing. No `-PreleaseStorePath` → no "releaseCi" config,
+    // so local/keystore-less builds stay unsigned. CI opts in via `SIGNING_ARGS`.
+    signingConfigs {
+        if (project.findProperty("releaseStorePath") != null) {
+            create("releaseCi") {
+                storeFile = file(project.findProperty("releaseStorePath") as String)
+                storePassword = project.findProperty("releaseStorePassword") as? String
+                keyAlias = project.findProperty("releaseKeyAlias") as? String
+                keyPassword = project.findProperty("releaseKeyPassword") as? String
+            }
+        }
+    }
+
     buildTypes {
         getByName("release") {
             isMinifyEnabled = false
+            // null (no releaseCi config) → release APK is unsigned.
+            signingConfig = signingConfigs.findByName("releaseCi")
         }
     }
 
