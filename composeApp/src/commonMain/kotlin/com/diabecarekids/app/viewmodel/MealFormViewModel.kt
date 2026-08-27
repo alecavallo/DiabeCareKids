@@ -62,6 +62,11 @@ class MealFormViewModel(
         _savedMeal.value = null
     }
 
+    /** Resets the form to a pristine state so the next meal starts clean (ID-LEAK). */
+    fun reset() {
+        _state.value = MealFormState()
+    }
+
     fun onFoodQueryChange(query: String) {
         _state.update { it.copy(foodQuery = query, error = null) }
         if (query.isBlank()) {
@@ -135,11 +140,17 @@ class MealFormViewModel(
         _state.update { it.copy(mealType = type) }
     }
 
-    /** Captures an optional before photo; null on cancel (INV-005). */
+    /** Captures an optional before photo; null on cancel (INV-005). A cancelled
+     *  capture must NOT erase a photo already captured this session. A denied
+     *  camera runtime permission surfaces a friendly error instead of a crash. */
     fun takePhoto() {
         scope.launch {
             val uri = photoCapture.takePhoto()
-            _state.update { it.copy(photoUri = uri) }
+            if (uri != null) {
+                _state.update { it.copy(photoUri = uri) }
+            } else if (photoCapture.consumeCameraDenied()) {
+                _state.update { it.copy(error = CAMERA_DENIED_MESSAGE) }
+            }
         }
     }
 
@@ -161,7 +172,8 @@ class MealFormViewModel(
             store.save(registro)
             alarmScheduler.schedule(registro.id)
             _savedMeal.value = registro
-            _state.update { it.copy(isSaving = false) }
+            // Reset the form so the next meal does not leak this meal's photo/query/carbs (ID-LEAK).
+            reset()
         }
     }
 
@@ -189,6 +201,7 @@ class MealFormViewModel(
         const val AI_LABEL = "[AI Estimated]"
         const val MANUAL_LABEL = "Manual"
         const val DEFAULT_USER_ID = "local"
+        const val CAMERA_DENIED_MESSAGE = "Camera permission denied. Grant camera access to add a photo."
         fun formatCarbs(value: Double): String =
             if (value == value.toLong().toDouble()) value.toLong().toString() else value.toString()
     }

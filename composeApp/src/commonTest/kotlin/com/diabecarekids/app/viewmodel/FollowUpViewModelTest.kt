@@ -64,6 +64,26 @@ class FollowUpViewModelTest {
     }
 
     @Test
+    fun cancelledSecondCaptureKeepsExistingAfterPhoto() = runTest {
+        val store = FakePersistenceStore()
+        val photo = FakePhotoCapture()
+        val vm = FollowUpViewModel(store, photo, this, baseRegistro())
+
+        photo.results.addAll(listOf("file://after.jpg", null)) // capture then cancel
+        vm.takePhoto()
+        advanceUntilIdle()
+        assertEquals("file://after.jpg", vm.state.value.photoUri, "first capture should set the after photo")
+
+        vm.takePhoto()
+        advanceUntilIdle()
+        assertEquals(
+            "file://after.jpg",
+            vm.state.value.photoUri,
+            "a cancelled second capture must NOT erase the existing after photo",
+        )
+    }
+
+    @Test
     fun saveRequiresTwoHourBg() = runTest {
         val store = FakePersistenceStore()
         val vm = FollowUpViewModel(store, FakePhotoCapture(), this, baseRegistro())

@@ -32,7 +32,11 @@ fun App(graph: AppGraph) {
                 }
                 FollowUpScreen(
                     viewModel = followUpViewModel,
-                    onDone = { route = Route.T0 },
+                    onDone = {
+                        // Returning T2 -> T0 starts a fresh meal: reset the graph singleton form (ID-LEAK).
+                        graph.mealFormViewModel.reset()
+                        route = Route.T0
+                    },
                 )
             }
         }

@@ -7,6 +7,9 @@ import com.diabecarekids.app.platform.PhotoCapture
 import com.diabecarekids.app.platform.PostprandialAlarmScheduler
 import com.diabecarekids.app.nutrition.CarbResolution
 import com.diabecarekids.app.nutrition.NutritionRepository
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 /** Nutrition facade stub for ViewModel tests. */
 class FakeNutritionRepository(
@@ -35,12 +38,30 @@ class FakePersistenceStore : PersistenceStore {
     }
 }
 
-/** [PhotoCapture] stub. [uri] controls what [takePhoto] returns (null = cancel). */
+/** [PhotoCapture] stub. [uri] controls what [takePhoto] returns (null = cancel).
+ *  When [results] is non-empty, each [takePhoto] call consumes the next entry
+ *  (e.g. to simulate a capture followed by a cancelled capture). */
 class FakePhotoCapture(private val uri: String? = "file://captured.jpg") : PhotoCapture {
     var calls = 0
+    val results = mutableListOf<String?>()
+
+    private val _cameraDenied = MutableStateFlow(false)
+    override val cameraDenied: StateFlow<Boolean> = _cameraDenied.asStateFlow()
+
+    override fun consumeCameraDenied(): Boolean {
+        val denied = _cameraDenied.value
+        _cameraDenied.value = false
+        return denied
+    }
+
+    /** Simulates the user denying the CAMERA runtime permission on the next call. */
+    fun markCameraDenied() {
+        _cameraDenied.value = true
+    }
+
     override suspend fun takePhoto(): String? {
         calls++
-        return uri
+        return if (results.isNotEmpty()) results.removeAt(0) else uri
     }
 }
 

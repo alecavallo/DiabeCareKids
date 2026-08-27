@@ -65,11 +65,17 @@ class FollowUpViewModel(
         _state.update { it.copy(bgPost2h = value.filter { c -> c.isDigit() || c == '.' }, error = null) }
     }
 
-    /** Captures an optional after photo; null on cancel (INV-005). */
+    /** Captures an optional after photo; null on cancel (INV-005). A cancelled
+     *  capture must NOT erase a photo already captured this session. A denied
+     *  camera runtime permission surfaces a friendly error instead of a crash. */
     fun takePhoto() {
         scope.launch {
             val uri = photoCapture.takePhoto()
-            _state.update { it.copy(photoUri = uri) }
+            if (uri != null) {
+                _state.update { it.copy(photoUri = uri) }
+            } else if (photoCapture.consumeCameraDenied()) {
+                _state.update { it.copy(error = CAMERA_DENIED_MESSAGE) }
+            }
         }
     }
 
@@ -95,5 +101,9 @@ class FollowUpViewModel(
             _completed.value = updated
             _state.update { it.copy(isSaving = false) }
         }
+    }
+
+    private companion object {
+        const val CAMERA_DENIED_MESSAGE = "Camera permission denied. Grant camera access to add a photo."
     }
 }

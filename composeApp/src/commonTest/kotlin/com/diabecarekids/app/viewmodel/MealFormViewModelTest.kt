@@ -112,6 +112,76 @@ class MealFormViewModelTest {
     }
 
     @Test
+    fun cancelledSecondCaptureKeepsExistingPhoto() = runTest {
+        val repo = FakeNutritionRepository()
+        val store = FakePersistenceStore()
+        val photo = FakePhotoCapture()
+        val vm = MealFormViewModel(repo, store, photo, FakeAlarmScheduler(), this)
+
+        photo.results.addAll(listOf("file://first.jpg", null)) // capture then cancel
+        vm.takePhoto()
+        advanceUntilIdle()
+        assertEquals("file://first.jpg", vm.state.value.photoUri, "first capture should set the photo")
+
+        vm.takePhoto()
+        advanceUntilIdle()
+        assertEquals(
+            "file://first.jpg",
+            vm.state.value.photoUri,
+            "a cancelled second capture must NOT erase the existing photo",
+        )
+    }
+
+    @Test
+    fun cameraDeniedSurfacesFriendlyErrorAndSetsNoPhoto() = runTest {
+        val repo = FakeNutritionRepository()
+        val store = FakePersistenceStore()
+        val photo = FakePhotoCapture(uri = null)
+        val vm = MealFormViewModel(repo, store, photo, FakeAlarmScheduler(), this)
+
+        photo.results.addAll(listOf(null)) // denied -> takePhoto returns null
+        photo.markCameraDenied()
+        vm.takePhoto()
+        advanceUntilIdle()
+
+        assertNull(vm.state.value.photoUri, "a denied permission must not set a photo")
+        assertEquals(
+            true,
+            vm.state.value.error?.contains("permission", ignoreCase = true),
+            "a denied camera permission must surface a friendly error state",
+        )
+    }
+
+    @Test
+    fun resetClearsFormForNextMeal() = runTest {
+        val repo = FakeNutritionRepository(resolution = CarbResolution.Resolved(50.0, CarbSource.USDA))
+        val store = FakePersistenceStore()
+        val photo = FakePhotoCapture(uri = "file://meal.jpg")
+        val vm = MealFormViewModel(repo, store, photo, FakeAlarmScheduler(), this)
+
+        vm.onFoodQueryChange("apple")
+        vm.resolve()
+        advanceUntilIdle()
+        vm.onBgInitialChange("110")
+        vm.takePhoto()
+        advanceUntilIdle()
+        assertTrue(vm.state.value.photoUri != null, "photo should be captured before save")
+
+        // Saving persists the meal and resets the form so the next meal starts clean.
+        vm.save()
+        advanceUntilIdle()
+
+        val s = vm.state.value
+        assertEquals("", s.foodQuery, "fresh meal must start with an empty food query")
+        assertEquals("", s.carbInput, "fresh meal must start with an empty carb field")
+        assertEquals("", s.bgInitial, "fresh meal must start with an empty BG field")
+        assertNull(s.photoUri, "fresh meal must start with no photo (no leaked foto_antes_url)")
+        assertTrue(s.suggestions.isEmpty(), "fresh meal must start with no stale suggestions")
+        assertNull(s.selectedFoodName, "fresh meal must start with no selected food")
+        assertEquals(false, s.isSaving, "fresh meal must not be stuck in a saving state")
+    }
+
+    @Test
     fun suggestionSelectFillsEditableCarb() = runTest {
         val food = com.diabecarekids.app.domain.FoodItem("Oatmeal", 27.0, CarbSource.USDA)
         val repo = FakeNutritionRepository(suggestions = listOf(food))
