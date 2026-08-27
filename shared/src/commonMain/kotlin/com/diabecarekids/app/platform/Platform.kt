@@ -1,5 +1,6 @@
 package com.diabecarekids.app.platform
 
+import com.diabecarekids.app.domain.TipoComida
 import com.diabecarekids.app.domain.UbicacionGps
 import io.ktor.client.engine.HttpClientEngine
 import kotlinx.coroutines.flow.StateFlow
@@ -14,6 +15,23 @@ expect fun httpClientEngine(): HttpClientEngine
 
 /** Current time as epoch milliseconds. */
 expect fun epochMillisNow(): Long
+
+/**
+ * Epoch milliseconds for the given local wall-clock time today, in the
+ * platform's current timezone (DST-aware). Mirrors the [epochMillisNow] seam
+ * (design D1); used by [com.diabecarekids.app.domain.ReminderScheduleEngine].
+ */
+expect fun todayAtLocalTimeMillis(hour: Int, minute: Int): Long
+
+/**
+ * Schedules offline background work that fires a local meal reminder at
+ * [triggerAt], and cancels all such work. Implemented by the platform bridge
+ * (WorkManager in composeApp androidMain — Slice 2).
+ */
+interface MealReminderScheduler {
+    fun schedule(tipo: TipoComida, triggerAt: Long)
+    fun cancelAll()
+}
 
 /**
  * Captures a meal photo (REQ-MEAL-004 / INV-005). Returns a temp URI string,
