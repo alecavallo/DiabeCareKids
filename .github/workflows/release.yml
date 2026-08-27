@@ -1,0 +1,128 @@
+name: Release
+
+# One signed, installable release APK per merge to main. No secrets stored in
+# the repo or GitHub Actions: a throwaway, job-scoped keystore is generated in
+# the runner and its password is derived from commit + run identity. No Play
+# Store / AAB submission. Non-goals per design.md and spec release-automation.
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+# Serialize rapid merges: only one release process runs at a time and queued
+# runs are never cancelled, so exactly one release is produced per merge.
+concurrency:
+  group: release-main
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Release APK
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Derive deterministic, monotonic commit-identity versioning
+      # (REQ-3): unique per merge, never overwrites prior artifacts.
+      - name: Derive version + keystore password
+        id: derive
+        run: |
+          set -euo pipefail
+          COUNT=$(git rev-list --count HEAD)
+          SHA7=$(git rev-parse --short=7 HEAD)
+          # Throwaway keystore password, derived from commit + run identity so
+          # nothing secret is stored anywhere.
+          PASS=$(printf '%s' "$GITHUB_SHA-${{ github.run_id }}" | sha256sum | cut -c1-32)
+          TAG="v${COUNT}-${SHA7}"
+          echo "COUNT=$COUNT" >> "$GITHUB_ENV"
+          echo "SHA7=$SHA7" >> "$GITHUB_ENV"
+          echo "PASS=$PASS" >> "$GITHUB_ENV"
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
+          echo "Derived tag=$TAG count=$COUNT sha=$SHA7"
+
+      # RED (threat: push-state/tag creation, REQ-1/REQ-3): a re-run of the
+      # same commit would collide with an existing immutable tag. Fail loudly
+      # rather than ever overwrite. Rapid merges serialize via concurrency.
+      - name: Fail loudly if tag already exists (no overwrite)
+        run: |
+          set -euo pipefail
+          if git ls-remote --tags origin "refs/tags/$TAG" | grep -q "$TAG"; then
+            echo "::error::Release tag $TAG already exists. Re-running the same commit is not allowed (no overwrite)." >&2
+            exit 1
+          fi
+          echo "Tag $TAG is free."
+
+      # Throwaway, job-scoped keystore (REQ-4/REQ-5). Never committed, never a
+      # secret. A fresh runner dies with it; a new signature is minted each
+      # release, which is fine for sideload distribution.
+      - name: Generate throwaway keystore
+        run: |
+          keytool -genkeypair -keystore ci-release.keystore -alias ci-release \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -storepass "$PASS" -keypass "$PASS" \
+            -dname "CN=DiabeCareKids CI, OU=Release, O=DiabeCareKids, C=AR"
+
+      # Zero-host build (REQ-2): every Gradle command runs inside the
+      # kmp-builder Docker container via the Makefile (INV-007). The repo is
+      # bind-mounted at /workspace in the container, so the keystore generated
+      # above is reachable at its container path.
+      - name: Build signed release APK
+        run: |
+          make assemble-release \
+            VERSION_CODE="$COUNT" \
+            VERSION_NAME="0.1.$COUNT+$SHA7" \
+            SIGNING_ARGS="-PreleaseStorePath=/workspace/ci-release.keystore -PreleaseStorePassword=$PASS -PreleaseKeyAlias=ci-release -PreleaseKeyPassword=$PASS"
+
+      # RED gate (REQ-4): the release APK must be SIGNED. If only the unsigned
+      # variant was produced, the build did not opt into signing — fail.
+      - name: Verify APK is signed (apksigner)
+        run: |
+          set -euo pipefail
+          APK=composeApp/build/outputs/apk/release/composeApp-release.apk
+          UNSIGNED=composeApp/build/outputs/apk/release/composeApp-release-unsigned.apk
+          if [[ ! -f "$APK" && -f "$UNSIGNED" ]]; then
+            echo "::error::Release APK is UNSIGNED (only $UNSIGNED exists). Signing not opted in." >&2
+            exit 1
+          fi
+          docker compose -f docker/docker-compose.yml run --rm kmp-builder \
+            /bin/bash -c "/opt/android-sdk/build-tools/34.0.0/apksigner verify --print-certs composeApp/build/outputs/apk/release/composeApp-release.apk"
+
+      # APK contract (REQ-4): minSdk 24 / targetSdk 34 / universal (no ABI
+      # splits) so the artifact is installable on Android 7.0–14+.
+      - name: Assert APK contract (aapt badging)
+        run: |
+          set -euo pipefail
+          OUT=$(docker compose -f docker/docker-compose.yml run --rm kmp-builder \
+            /bin/bash -c "/opt/android-sdk/build-tools/34.0.0/aapt dump badging composeApp/build/outputs/apk/release/composeApp-release.apk")
+          echo "$OUT"
+          grep -q "sdkVersion:'24'" <<<"$OUT" || { echo "::error::minSdk is not 24" >&2; exit 1; }
+          grep -q "targetSdkVersion:'34'" <<<"$OUT" || { echo "::error::targetSdk is not 34" >&2; exit 1; }
+          if grep -q "native-code:" <<<"$OUT"; then
+            echo "::error::APK has ABI splits (native-code); expected universal." >&2
+            exit 1
+          fi
+          echo "APK contract OK (minSdk 24 / targetSdk 34 / universal)."
+
+      # Stage the signed APK under the versioned asset name.
+      - name: Stage release asset
+        run: |
+          cp composeApp/build/outputs/apk/release/composeApp-release.apk "DiabeCareKids-$TAG.apk"
+
+      - name: Build release notes
+        run: |
+          git log --oneline --no-decorate -20 HEAD > release-notes.md
+
+      # Publish (REQ-1/REQ-3): tag v<count>-<sha7>, attach the renamed signed
+      # APK, notes from git log. SHA-pinned for supply-chain safety (design.md).
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65
+        with:
+          tag_name: ${{ env.TAG }}
+          name: ${{ env.TAG }}
+          body_path: release-notes.md
+          files: DiabeCareKids-${{ env.TAG }}.apk
