@@ -1,5 +1,6 @@
 package com.diabecarekids.app.nutrition
 
+import com.diabecarekids.app.domain.CarbSource
 import com.diabecarekids.app.domain.FoodItem
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
@@ -31,8 +32,8 @@ class UsdaApiClientTest {
                         {
                           "fdcId": 173944,
                           "description": "Bananas, raw",
-                          "foodNutrients": [
-                            { "nutrientId": 205, "nutrientName": "Carbohydrate, by difference", "value": 22.84 }
+                            "foodNutrients": [
+                            { "nutrientId": 1005, "nutrientName": "Carbohydrate, by difference", "value": 22.84 }
                           ]
                         }
                       ]
@@ -50,6 +51,7 @@ class UsdaApiClientTest {
         assertEquals(1, foods.size)
         assertEquals("Bananas, raw", foods[0].name)
         assertEquals(22.84, foods[0].carbsGrams)
+        assertEquals(CarbSource.USDA, foods[0].source, "a carb-nutrient 1005 match must resolve a USDA food (not skip it)")
     }
 
     @Test

@@ -52,7 +52,7 @@ class UsdaApiClient(
         val description: String = "",
         val foodNutrients: List<UsdaNutrient> = emptyList(),
     ) {
-        /** "Carbohydrate, by difference" = nutrientId 205. */
+        /** "Carbohydrate, by difference" = nutrientId 1005 (FDC v1; 205 was the legacy NDB nutrientNumber). */
         val carbohydrateGrams: Double?
             get() = foodNutrients.firstOrNull { it.nutrientId == CARB_NUTRIENT_ID }?.value
     }
@@ -62,6 +62,6 @@ class UsdaApiClient(
 
     private companion object {
         const val DEFAULT_BASE_URL = "https://api.nal.usda.gov/fdc/v1"
-        const val CARB_NUTRIENT_ID = 205
+        const val CARB_NUTRIENT_ID = 1005
     }
 }
