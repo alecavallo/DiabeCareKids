@@ -14,6 +14,8 @@ import com.diabecarekids.app.nutrition.UsdaApiClient
 import com.diabecarekids.app.persistence.InMemoryPersistenceStore
 import com.diabecarekids.app.photocapture.TakePicturePhotoCapture
 import com.diabecarekids.app.platform.httpClientEngine
+import com.diabecarekids.app.sos.AndroidHaptics
+import com.diabecarekids.app.sos.FusedLocationProvider
 import io.ktor.client.HttpClient
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -21,10 +23,13 @@ import kotlinx.coroutines.SupervisorJob
 
 class MainActivity : ComponentActivity() {
     private val photoCapture = TakePicturePhotoCapture(this)
+    private val locationProvider = FusedLocationProvider(this)
+    private val haptics = AndroidHaptics(this)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         photoCapture.register(this)
+        locationProvider.register(this)
         enableEdgeToEdge()
         val graph = buildAppGraph()
         setContent {
@@ -51,6 +56,9 @@ class MainActivity : ComponentActivity() {
             store = store,
             photoCapture = photoCapture,
             alarmScheduler = scheduler,
+            locationProvider = locationProvider,
+            haptics = haptics,
+            locationPermission = locationProvider,
             scope = scope,
         )
     }

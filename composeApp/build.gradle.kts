@@ -34,6 +34,8 @@ kotlin {
             implementation(compose.preview)
             implementation(libs.androidx.activity.compose)
             implementation(libs.work.runtime.ktx)
+            // Fused location for the SOS alert (CAP-001 / REQ-SOS-003).
+            implementation(libs.play.services.location)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)

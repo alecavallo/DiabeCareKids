@@ -44,6 +44,7 @@ import com.diabecarekids.app.viewmodel.MealFormViewModel
 fun MealFormScreen(
     viewModel: MealFormViewModel,
     onMealSaved: (com.diabecarekids.app.domain.RegistroComida) -> Unit,
+    onOpenSos: () -> Unit,
 ) {
     val state by viewModel.state.collectAsState()
     val savedMeal by viewModel.savedMeal.collectAsState()
@@ -122,6 +123,17 @@ fun MealFormScreen(
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Text(if (state.isSaving) "Guardando..." else "Guardar (seguir a T2)")
+                }
+            }
+
+            // Emergency SOS entry (CAP-001). Reachability from the meal flow;
+            // design decision #5 hosts the 3s hold on the dedicated SosScreen.
+            item {
+                OutlinedButton(
+                    onClick = onOpenSos,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("SOS de emergencia")
                 }
             }
         }

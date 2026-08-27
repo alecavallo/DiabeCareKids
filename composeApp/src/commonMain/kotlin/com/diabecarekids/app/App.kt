@@ -10,6 +10,7 @@ import com.diabecarekids.app.navigation.AppGraph
 import com.diabecarekids.app.navigation.Route
 import com.diabecarekids.app.ui.FollowUpScreen
 import com.diabecarekids.app.ui.MealFormScreen
+import com.diabecarekids.app.ui.SosScreen
 
 /**
  * Root composable. Sealed-route state drives navigation between the T0 meal form
@@ -24,6 +25,7 @@ fun App(graph: AppGraph) {
             is Route.T0 -> MealFormScreen(
                 viewModel = graph.mealFormViewModel,
                 onMealSaved = { registro -> route = Route.T2(registro) },
+                onOpenSos = { route = Route.Sos },
             )
             is Route.T2 -> {
                 // Key on the meal id so state survives recomposition but resets on navigation.
@@ -35,6 +37,18 @@ fun App(graph: AppGraph) {
                     onDone = {
                         // Returning T2 -> T0 starts a fresh meal: reset the graph singleton form (ID-LEAK).
                         graph.mealFormViewModel.reset()
+                        route = Route.T0
+                    },
+                )
+            }
+            is Route.Sos -> {
+                val sosViewModel = graph.sosViewModel
+                SosScreen(
+                    viewModel = sosViewModel,
+                    permissionRequester = graph.locationPermission,
+                    onBack = {
+                        // Reset the singleton machine on exit so re-entry starts clean (INV-003).
+                        sosViewModel.reset()
                         route = Route.T0
                     },
                 )

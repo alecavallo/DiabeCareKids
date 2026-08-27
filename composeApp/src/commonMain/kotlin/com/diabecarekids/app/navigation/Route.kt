@@ -12,4 +12,7 @@ sealed interface Route {
 
     /** T2 — postprandial follow-up for the just-saved [RegistroComida]. */
     data class T2(val registro: RegistroComida) : Route
+
+    /** SOS — hold-to-activate emergency alert (CAP-001). */
+    data object Sos : Route
 }
