@@ -23,13 +23,21 @@ kotlin {
             implementation(compose.material3)
             implementation(compose.ui)
             implementation(project(":shared"))
+            implementation(libs.coroutines.core)
+            implementation(libs.androidx.lifecycle.runtime.compose)
+            // Needed to build an HttpClient around the shared expect/actual engine.
+            implementation(libs.ktor.client.core)
+            // The shared API clients' default `Json` arg resolves at the call site.
+            implementation(libs.kotlinx.serialization.json)
         }
         androidMain.dependencies {
             implementation(compose.preview)
             implementation(libs.androidx.activity.compose)
+            implementation(libs.work.runtime.ktx)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
+            implementation(libs.coroutines.test)
         }
     }
 }

@@ -1,22 +1,40 @@
 package com.diabecarekids.app
 
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import com.diabecarekids.app.navigation.AppGraph
+import com.diabecarekids.app.navigation.Route
+import com.diabecarekids.app.ui.FollowUpScreen
+import com.diabecarekids.app.ui.MealFormScreen
 
-/** Root composable for the DiabeCareKids Hello World vertical slice. */
+/**
+ * Root composable. Sealed-route state drives navigation between the T0 meal form
+ * and the T2 postprandial follow-up (design DECISION: no nav-compose dependency).
+ * The [graph] composition root supplies the ViewModels.
+ */
 @Composable
-fun App() {
+fun App(graph: AppGraph) {
     MaterialTheme {
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(text = "Hello World")
+        var route by remember { mutableStateOf<Route>(Route.T0) }
+        when (val current = route) {
+            is Route.T0 -> MealFormScreen(
+                viewModel = graph.mealFormViewModel,
+                onMealSaved = { registro -> route = Route.T2(registro) },
+            )
+            is Route.T2 -> {
+                // Key on the meal id so state survives recomposition but resets on navigation.
+                val followUpViewModel = remember(current.registro.id) {
+                    graph.followUpViewModel(current.registro)
+                }
+                FollowUpScreen(
+                    viewModel = followUpViewModel,
+                    onDone = { route = Route.T0 },
+                )
+            }
         }
     }
 }
