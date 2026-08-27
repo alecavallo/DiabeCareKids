@@ -7,6 +7,10 @@
         android:name="android.hardware.camera"
         android:required="false" />
 
+    <!-- Offline local meal reminders (CAP-006). Runtime request is deferred/no-op
+         this slice: on API 33+ the notification is silently dropped when denied. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <application
         android:allowBackup="true"
         android:label="DiabeCareKids"
