@@ -5,10 +5,12 @@ package com.diabecarekids.app.viewmodel
 import com.diabecarekids.app.domain.CarbSource
 import com.diabecarekids.app.domain.RegistroComida
 import com.diabecarekids.app.domain.TipoComida
+import com.diabecarekids.app.export.PdfExportOutcome
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class HistoryViewModelTest {
 
@@ -35,7 +37,7 @@ class HistoryViewModelTest {
         store.save(reg("new", at = 300L))
         store.save(reg("mid", at = 200L))
 
-        val vm = HistoryViewModel(store, this)
+        val vm = HistoryViewModel(store, FakePdfReportExporter(), FakeReportShareLauncher(), this)
         advanceUntilIdle()
 
         assertEquals(
@@ -47,7 +49,7 @@ class HistoryViewModelTest {
 
     @Test
     fun emptyStoreLoadsEmptyTimeline() = runTest {
-        val vm = HistoryViewModel(FakePersistenceStore(), this)
+        val vm = HistoryViewModel(store = FakePersistenceStore(), exporter = FakePdfReportExporter(), shareLauncher = FakeReportShareLauncher(), scope = this)
         advanceUntilIdle()
 
         assertEquals(emptyList(), vm.state.value.records, "empty store must yield an empty timeline (R2)")
@@ -56,7 +58,7 @@ class HistoryViewModelTest {
     @Test
     fun reloadRefreshesAfterNewSave() = runTest {
         val store = FakePersistenceStore()
-        val vm = HistoryViewModel(store, this)
+        val vm = HistoryViewModel(store, FakePdfReportExporter(), FakeReportShareLauncher(), this)
         advanceUntilIdle()
         assertEquals(0, vm.state.value.records.size)
 
@@ -70,5 +72,69 @@ class HistoryViewModelTest {
             vm.state.value.records.map { it.id },
             "reload must reflect records persisted after the initial load",
         )
+    }
+
+    // --- PDF export flow (CAP-004, S2.7) ---
+
+    @Test
+    fun exportSuccessSharesReturnedUri() = runTest {
+        val store = FakePersistenceStore()
+        store.save(reg("in-range", at = 100L))
+        val exporter = FakePdfReportExporter(
+            outcome = PdfExportOutcome.Success("content://pdf/report.pdf", rowCount = 1),
+        )
+        val launcher = FakeReportShareLauncher()
+        val vm = HistoryViewModel(store, exporter, launcher, this)
+        advanceUntilIdle()
+
+        vm.exportReport(from = 0L, to = 200L)
+        advanceUntilIdle()
+
+        assertEquals(1, exporter.calls, "exporter must be invoked once")
+        assertTrue(
+            launcher.sharedUris.contains("content://pdf/report.pdf"),
+            "on Success the ViewModel must share the exporter's URI",
+        )
+        assertEquals(null, vm.state.value.exportError, "no error on success")
+        assertEquals(false, vm.state.value.isExporting, "exporting must reset after success")
+    }
+
+    @Test
+    fun exportFailureSetsErrorAndDoesNotShare() = runTest {
+        val store = FakePersistenceStore()
+        store.save(reg("in-range", at = 100L))
+        val exporter = FakePdfReportExporter(
+            outcome = PdfExportOutcome.Failure("disk full"),
+        )
+        val launcher = FakeReportShareLauncher()
+        val vm = HistoryViewModel(store, exporter, launcher, this)
+        advanceUntilIdle()
+
+        vm.exportReport(from = 0L, to = 200L)
+        advanceUntilIdle()
+
+        assertEquals("disk full", vm.state.value.exportError, "failure must surface exportError")
+        assertEquals(0, launcher.calls, "share must never be invoked on failure (safe-behavior)")
+        assertEquals(false, vm.state.value.isExporting, "exporting must reset after failure")
+    }
+
+    @Test
+    fun exportTogglesIsExportingAndIgnoresReentry() = runTest {
+        val store = FakePersistenceStore()
+        store.save(reg("in-range", at = 100L))
+        val exporter = FakePdfReportExporter(
+            outcome = PdfExportOutcome.Success("content://pdf/report.pdf", rowCount = 1),
+        )
+        val launcher = FakeReportShareLauncher()
+        val vm = HistoryViewModel(store, exporter, launcher, this)
+        advanceUntilIdle()
+
+        vm.exportReport(from = 0L, to = 200L)
+        // A re-entry while the first export is still running must be ignored.
+        vm.exportReport(from = 0L, to = 200L)
+        advanceUntilIdle()
+
+        assertEquals(1, exporter.calls, "re-entry while exporting must be ignored")
+        assertEquals(1, launcher.calls, "only the single accepted export shares")
     }
 }

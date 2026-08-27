@@ -1,6 +1,8 @@
 package com.diabecarekids.app.navigation
 
 import com.diabecarekids.app.domain.RegistroComida
+import com.diabecarekids.app.export.PdfReportExporter
+import com.diabecarekids.app.export.ReportShareLauncher
 import com.diabecarekids.app.persistence.PersistenceStore
 import com.diabecarekids.app.platform.PhotoCapture
 import com.diabecarekids.app.platform.PostprandialAlarmScheduler
@@ -26,6 +28,8 @@ class AppGraph(
     val store: PersistenceStore,
     val photoCapture: PhotoCapture,
     val alarmScheduler: PostprandialAlarmScheduler,
+    val pdfExporter: PdfReportExporter,
+    val reportShareLauncher: ReportShareLauncher,
     val scope: CoroutineScope,
 ) {
     /** T0 ViewModel is created once and reused across recompositions. */
@@ -55,7 +59,7 @@ class AppGraph(
      * creation, design decision; Add/Edit are scoped to the current form/record).
      */
     fun historyViewModel(): HistoryViewModel =
-        HistoryViewModel(store = store, scope = scope)
+        HistoryViewModel(store = store, exporter = pdfExporter, shareLauncher = reportShareLauncher, scope = scope)
 
     fun addPastRecordViewModel(): AddPastRecordViewModel =
         AddPastRecordViewModel(repository = repository, store = store, scope = scope)

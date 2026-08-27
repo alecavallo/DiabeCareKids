@@ -2,6 +2,10 @@ package com.diabecarekids.app.viewmodel
 
 import com.diabecarekids.app.domain.FoodItem
 import com.diabecarekids.app.domain.RegistroComida
+import com.diabecarekids.app.export.PdfExportOutcome
+import com.diabecarekids.app.export.PdfReportData
+import com.diabecarekids.app.export.PdfReportExporter
+import com.diabecarekids.app.export.ReportShareLauncher
 import com.diabecarekids.app.persistence.PersistenceStore
 import com.diabecarekids.app.platform.PhotoCapture
 import com.diabecarekids.app.platform.PostprandialAlarmScheduler
@@ -72,4 +76,30 @@ class FakeAlarmScheduler : PostprandialAlarmScheduler {
     val cancelled = mutableListOf<String>()
     override fun schedule(mealId: String) { scheduled += mealId }
     override fun cancel(mealId: String) { cancelled += mealId }
+}
+
+/**
+ * [PdfReportExporter] stub (CAP-004). [outcome] controls what [export] returns;
+ * records the data it received and how many times it was called.
+ */
+class FakePdfReportExporter(
+    var outcome: PdfExportOutcome = PdfExportOutcome.Success("content://pdf/report.pdf", 0),
+) : PdfReportExporter {
+    var calls = 0
+    var lastData: PdfReportData? = null
+    override suspend fun export(data: PdfReportData): PdfExportOutcome {
+        calls++
+        lastData = data
+        return outcome
+    }
+}
+
+/** [ReportShareLauncher] recording stub (CAP-004). */
+class FakeReportShareLauncher : ReportShareLauncher {
+    val sharedUris = mutableListOf<String>()
+    var calls = 0
+    override fun sharePdf(uri: String) {
+        calls++
+        sharedUris += uri
+    }
 }

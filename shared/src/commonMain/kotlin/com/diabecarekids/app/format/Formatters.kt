@@ -1,20 +1,30 @@
-package com.diabecarekids.app.ui
+package com.diabecarekids.app.format
 
 /**
- * Minimal epoch-millis -> wall-clock UTC formatter (design decision: no
- * kotlinx-datetime dependency; records are stored as epoch millis and treated
- * as wall-clock-as-UTC). Used by the timeline to render a record's date/time.
+ * Shared presentation formatters (CAP-004, design DECISION: lift to shared so
+ * the PDF export builder and the UI produce identical strings for the same
+ * record — report values must equal screen values).
  *
- * Pure arithmetic (civil-from-days, Howard Hinnant's algorithm) so it runs in
- * commonMain with no platform date APIs. Format: "yyyy-MM-dd HH:mm".
+ * [formatEpochMillis] is a minimal epoch-millis -> wall-clock UTC formatter
+ * (design decision: no kotlinx-datetime dependency; records are stored as epoch
+ * millis and treated as wall-clock-as-UTC). Pure arithmetic (civil-from-days,
+ * Howard Hinnant's algorithm) so it runs in commonMain with no platform date
+ * APIs. Format: "yyyy-MM-dd HH:mm".
  */
-internal fun formatEpochMillis(millis: Long): String {
+fun formatEpochMillis(millis: Long): String {
     val days = Math.floorDiv(millis, 86_400_000L)
     val secondsOfDay = Math.floorMod(millis, 86_400_000L) / 1000L
     val hour = (secondsOfDay / 3600L).toInt()
     val minute = ((secondsOfDay % 3600L) / 60L).toInt()
     val (year, month, day) = civilFromDays(days)
     return "%04d-%02d-%02d %02d:%02d".format(year, month, day, hour, minute)
+}
+
+/** Formats a gram value for display, rounding to 1 decimal to avoid float
+ *  artifacts like 19.413999999999998 rendering as-is (ID-ROUND). */
+fun formatGrams(value: Double): String {
+    val rounded = kotlin.math.round(value * 10.0) / 10.0
+    return if (rounded == rounded.toLong().toDouble()) rounded.toLong().toString() else rounded.toString()
 }
 
 /** Howard Hinnant's civil_from_days: days since epoch -> (year, month, day). */

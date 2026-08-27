@@ -32,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.diabecarekids.app.domain.FoodItem
 import com.diabecarekids.app.domain.TipoComida
+import com.diabecarekids.app.format.formatGrams
 import com.diabecarekids.app.viewmodel.BG_QUICK_CHIPS
 import com.diabecarekids.app.viewmodel.MealFormState
 import com.diabecarekids.app.viewmodel.MealFormViewModel
@@ -171,9 +172,3 @@ private fun QuickBgSelector(current: String, onChange: (String) -> Unit) {
     }
 }
 
-/** Formats a gram value for display, rounding to 1 decimal to avoid float
- *  artifacts like 19.413999999999998 rendering as-is (ID-ROUND). */
-internal fun formatGrams(value: Double): String {
-    val rounded = kotlin.math.round(value * 10.0) / 10.0
-    return if (rounded == rounded.toLong().toDouble()) rounded.toLong().toString() else rounded.toString()
-}
