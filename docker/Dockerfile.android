@@ -1,0 +1,36 @@
+# Zero-host Android/KMP build environment (INV-007).
+#
+# Provides JDK 17 (Temurin), the Android SDK command-line tools with
+# auto-accepted licenses, and the sdkmanager-installed SDK packages. The host
+# only needs Docker + GNU Make; no native JDK/Android SDK is required.
+
+FROM eclipse-temurin:17-jdk
+
+ENV ANDROID_HOME=/opt/android-sdk \
+    ANDROID_SDK_ROOT=/opt/android-sdk \
+    GRADLE_USER_HOME=/root/.gradle \
+    PATH=$PATH:/opt/android-sdk/cmdline-tools/latest/bin:/opt/android-sdk/platform-tools
+
+# Base tooling needed to fetch and unpack the SDK.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        curl \
+        unzip \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Android command-line tools into the SDK home.
+ARG CMDLINE_TOOLS_VERSION=11076708
+RUN mkdir -p "$ANDROID_HOME/cmdline-tools" \
+    && curl -fsSL -o /tmp/cmdline-tools.zip \
+        "https://dl.google.com/android/repository/commandlinetools-linux-${CMDLINE_TOOLS_VERSION}_latest.zip" \
+    && unzip -q /tmp/cmdline-tools.zip -d /tmp/cmdline-tools \
+    && mv /tmp/cmdline-tools/cmdline-tools "$ANDROID_HOME/cmdline-tools/latest" \
+    && rm -rf /tmp/cmdline-tools /tmp/cmdline-tools.zip
+
+# Auto-accept licenses, then install the pinned SDK packages.
+RUN yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses \
+    && "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
+        "platform-tools" \
+        "platforms;android-34" \
+        "build-tools;34.0.0"
+
+WORKDIR /workspace

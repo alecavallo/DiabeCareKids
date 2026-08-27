@@ -1,0 +1,25 @@
+# VCS
+.git
+.gitignore
+
+# Gradle / Kotlin build output & caches
+build/
+**/build/
+.gradle/
+.kotlin/
+
+# JVM crash dumps
+*.hprof
+
+# IDE / OS transient files
+.idea/
+.DS_Store
+
+# Terraform generated state / local caches
+.terraform/
+*.tfstate
+*.tfstate.*
+
+# Agent tooling caches (transient, not needed by the Docker build)
+.atl/
+.serena/
