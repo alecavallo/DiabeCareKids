@@ -4,22 +4,33 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import com.diabecarekids.app.alarm.MealReminderDependencies
+import com.diabecarekids.app.alarm.MealReminderNotifier
 import com.diabecarekids.app.alarm.WorkManagerAlarmScheduler
+import com.diabecarekids.app.alarm.WorkManagerMealReminderScheduler
+import com.diabecarekids.app.domain.LocalTimeOfDay
+import com.diabecarekids.app.domain.ReminderScheduleEngine
 import com.diabecarekids.app.navigation.AppGraph
 import com.diabecarekids.app.nutrition.ApiConfig
 import com.diabecarekids.app.nutrition.CarbResolutionEngineImpl
 import com.diabecarekids.app.nutrition.GeminiApiClient
 import com.diabecarekids.app.nutrition.NutritionRepositoryImpl
 import com.diabecarekids.app.nutrition.UsdaApiClient
+import com.diabecarekids.app.persistence.InMemoryHorariosStore
 import com.diabecarekids.app.persistence.InMemoryPersistenceStore
+import com.diabecarekids.app.persistence.PersistenceRecentRecordWindowCheck
 import com.diabecarekids.app.photocapture.TakePicturePhotoCapture
+import com.diabecarekids.app.platform.epochMillisNow
 import com.diabecarekids.app.platform.httpClientEngine
+import com.diabecarekids.app.platform.todayAtLocalTimeMillis
+import com.diabecarekids.app.reminder.MealReminderOrchestrator
 import com.diabecarekids.app.sos.AndroidHaptics
 import com.diabecarekids.app.sos.FusedLocationProvider
 import io.ktor.client.HttpClient
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     private val photoCapture = TakePicturePhotoCapture(this)
@@ -51,6 +62,8 @@ class MainActivity : ComponentActivity() {
         val scheduler = WorkManagerAlarmScheduler(applicationContext)
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
+        wireMealReminders(store, scope)
+
         return AppGraph(
             repository = repository,
             store = store,
@@ -61,5 +74,41 @@ class MainActivity : ComponentActivity() {
             locationPermission = locationProvider,
             scope = scope,
         )
+    }
+
+    /**
+     * Composition-root wiring for scheduled meal reminders (CAP-006, design D7).
+     *
+     * Builds the shared stores/engine, populates the process-singleton
+     * [MealReminderDependencies] holder (so the worker can re-load state at
+     * execution time), and launches the orchestrator's `refresh()` in [scope].
+     * The engine consumes the seeded default schedule (no settings UI this
+     * change); reminders are (re)scheduled on app start and the worker
+     * re-checks the 2h suppression window at execution time.
+     */
+    private fun wireMealReminders(store: InMemoryPersistenceStore, scope: CoroutineScope) {
+        val horariosStore = InMemoryHorariosStore()
+        val recentCheck = PersistenceRecentRecordWindowCheck(store)
+        val engine = ReminderScheduleEngine(
+            now = { epochMillisNow() },
+            todayAt = { time: LocalTimeOfDay -> todayAtLocalTimeMillis(time.hour, time.minute) },
+        )
+        val mealScheduler = WorkManagerMealReminderScheduler(applicationContext)
+        val notifier = MealReminderNotifier(applicationContext)
+
+        MealReminderDependencies.populate(
+            horariosStore = horariosStore,
+            engine = engine,
+            recentCheck = recentCheck,
+            notifier = notifier,
+        )
+
+        val orchestrator = MealReminderOrchestrator(
+            engine = engine,
+            horariosStore = horariosStore,
+            recentCheck = recentCheck,
+            scheduler = mealScheduler,
+        )
+        scope.launch { orchestrator.refresh() }
     }
 }
