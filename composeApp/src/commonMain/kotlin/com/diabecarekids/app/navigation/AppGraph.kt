@@ -5,7 +5,10 @@ import com.diabecarekids.app.persistence.PersistenceStore
 import com.diabecarekids.app.platform.PhotoCapture
 import com.diabecarekids.app.platform.PostprandialAlarmScheduler
 import com.diabecarekids.app.nutrition.NutritionRepository
+import com.diabecarekids.app.viewmodel.AddPastRecordViewModel
+import com.diabecarekids.app.viewmodel.EditRecordViewModel
 import com.diabecarekids.app.viewmodel.FollowUpViewModel
+import com.diabecarekids.app.viewmodel.HistoryViewModel
 import com.diabecarekids.app.viewmodel.MealFormViewModel
 import kotlinx.coroutines.CoroutineScope
 
@@ -45,4 +48,18 @@ class AppGraph(
             scope = scope,
             registro = registro,
         )
+
+    /**
+     * Advanced View (CAP-005) factories. All three are created per navigation
+     * (History re-reads the store on every entry — refresh via per-navigation
+     * creation, design decision; Add/Edit are scoped to the current form/record).
+     */
+    fun historyViewModel(): HistoryViewModel =
+        HistoryViewModel(store = store, scope = scope)
+
+    fun addPastRecordViewModel(): AddPastRecordViewModel =
+        AddPastRecordViewModel(repository = repository, store = store, scope = scope)
+
+    fun editRecordViewModel(registro: RegistroComida): EditRecordViewModel =
+        EditRecordViewModel(store = store, scope = scope, registro = registro)
 }
