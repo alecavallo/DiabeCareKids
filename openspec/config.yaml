@@ -1,0 +1,36 @@
+# openspec/config.yaml — SDD configuration for DiabeCareKids
+schema: spec-driven
+
+context: |
+  Project: DiabeCareKids — Type 1 diabetes (Dm1) food registry for kids.
+  Stack (declared in spec, NOT yet scaffolded): Kotlin Multiplatform (KMP) targeting
+  Android + Compose Multiplatform; Dockerized zero-host toolchain
+  (docker/Dockerfile.android, Makefile); Terraform infra.
+  Repo state: greenfield skeleton — 1 commit, no build files, no source, no test runner.
+  Testing: declared via Docker (`make test`); toolchain not present — strict TDD disabled
+  until a runner exists.
+  Style: conventional commits, no AI attribution; AGENTS.md mandates `rtk` command prefix.
+
+rules:
+  proposal:
+    - Include rollback plan for risky changes
+  specs:
+    - Use Given/When/Then for scenarios
+    - Use RFC 2119 keywords (MUST, SHALL, SHOULD, MAY)
+  design:
+    - Include sequence diagrams for complex flows
+    - Document architecture decisions with rationale
+  tasks:
+    - Group by phase, use hierarchical numbering
+    - Keep tasks completable in one session
+  apply:
+    guidelines:
+      - Follow existing code patterns
+    tdd: false
+    test_command: "make test"
+  verify:
+    test_command: "make test"
+    build_command: ""
+    coverage_threshold: 0
+  archive:
+    - Warn before merging destructive deltas

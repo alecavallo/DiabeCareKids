@@ -25,3 +25,30 @@ replay_pid*
 
 # Kotlin Gradle plugin data, see https://kotlinlang.org/docs/whatsnew20.html#new-directory-for-kotlin-data-in-gradle-projects
 .kotlin/
+
+# --- DiabeCareKids build pipeline ---
+
+# Gradle build output
+build/
+.gradle/
+
+# The committed Gradle wrapper jar must NOT be ignored (generic *.jar rule above).
+!gradle/wrapper/gradle-wrapper.jar
+
+# Android
+local.properties
+*.apk
+.idea/
+
+# Throwaway CI release keystore (never committed; job-scoped)
+*.keystore
+*.jks
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+
+# Local agent/tooling state
+.atl/
+.serena/

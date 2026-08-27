@@ -1,0 +1,24 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  validate:
+    name: Validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # CI parity with local dev: everything runs through the zero-host
+      # Docker toolchain (make targets), never on a host JDK/SDK.
+      - name: Run unit tests
+        run: make test
+
+      - name: Build debug APK
+        run: make build
+
+      - name: Validate Terraform
+        run: make infra-validate

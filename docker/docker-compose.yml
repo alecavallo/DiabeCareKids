@@ -1,0 +1,20 @@
+services:
+  kmp-builder:
+    # Android SDK build tools (aapt2) ship as x86_64 Linux binaries only, so the
+    # whole toolchain runs as amd64. On Apple Silicon Docker Desktop emulates it
+    # via Rosetta; on Linux CI runners it is native amd64.
+    platform: linux/amd64
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.android
+    environment:
+      GRADLE_USER_HOME: /root/.gradle
+    volumes:
+      # Bind-mount the repo (read-write) so APKs and build outputs land on host.
+      - ..:/workspace
+      # Named volume caches the Gradle user home to avoid re-downloads.
+      - gradle-cache:/root/.gradle
+    working_dir: /workspace
+
+volumes:
+  gradle-cache:

@@ -1,0 +1,2 @@
+# Copy to `terraform.tfvars` and fill in your GCP project identifier.
+project_id = "diabecarekids"
