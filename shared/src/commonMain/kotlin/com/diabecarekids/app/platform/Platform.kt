@@ -1,5 +1,6 @@
 package com.diabecarekids.app.platform
 
+import com.diabecarekids.app.domain.UbicacionGps
 import io.ktor.client.engine.HttpClientEngine
 import kotlinx.coroutines.flow.StateFlow
 
@@ -34,4 +35,20 @@ interface PhotoCapture {
 interface PostprandialAlarmScheduler {
     fun schedule(mealId: String)
     fun cancel(mealId: String)
+}
+
+/**
+ * Captures the device's current GPS fix for an SOS alert (REQ-SOS-003).
+ * Returns null when location permissions are denied or coordinates are
+ * unavailable — the alert must still fire with null location data.
+ */
+interface LocationProvider {
+    suspend fun currentLocation(): UbicacionGps?
+}
+
+/**
+ * System haptic feedback on a successful SOS activation (REQ-SOS-001 SHOULD).
+ */
+interface Haptics {
+    fun vibrateSosTriggered()
 }
