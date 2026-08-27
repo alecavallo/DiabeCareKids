@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- Meal photos are staged under the app cache dir (TakePicturePhotoCapture). -->
+    <cache-path
+        name="meal_photos"
+        path="meal_photos/" />
+</paths>

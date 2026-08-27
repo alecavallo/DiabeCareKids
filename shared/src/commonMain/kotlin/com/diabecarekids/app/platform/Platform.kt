@@ -1,6 +1,7 @@
 package com.diabecarekids.app.platform
 
 import io.ktor.client.engine.HttpClientEngine
+import kotlinx.coroutines.flow.StateFlow
 
 /**
  * Platform seam. Each supported platform provides its own actual
@@ -19,6 +20,12 @@ expect fun epochMillisNow(): Long
  */
 interface PhotoCapture {
     suspend fun takePhoto(): String?
+
+    /** True when the most recent [takePhoto] was blocked by a denied camera runtime permission. */
+    val cameraDenied: StateFlow<Boolean>
+
+    /** Reads and clears [cameraDenied]. Call after surfacing the denial to the user. */
+    fun consumeCameraDenied(): Boolean
 }
 
 /**
