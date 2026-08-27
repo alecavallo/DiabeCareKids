@@ -13,7 +13,10 @@ import com.diabecarekids.app.sos.InMemoryGuardianNotifier
 import com.diabecarekids.app.sos.LocationPermissionRequester
 import com.diabecarekids.app.sos.SosController
 import com.diabecarekids.app.sos.SosHoldStateMachine
+import com.diabecarekids.app.viewmodel.AddPastRecordViewModel
+import com.diabecarekids.app.viewmodel.EditRecordViewModel
 import com.diabecarekids.app.viewmodel.FollowUpViewModel
+import com.diabecarekids.app.viewmodel.HistoryViewModel
 import com.diabecarekids.app.viewmodel.MealFormViewModel
 import com.diabecarekids.app.viewmodel.SosViewModel
 import kotlinx.coroutines.CoroutineScope
@@ -60,6 +63,9 @@ class AppGraph(
         )
 
     /**
+    */
+
+    /**
      * SOS ViewModel is created once and reused across recompositions. The fire
      * pipeline's [GuardianNotifier] is the shared in-memory placeholder (design
      * decision #4 — real Firestore/FCM transport is deferred to a later change);
@@ -80,6 +86,20 @@ class AppGraph(
         )
         SosViewModel(controller)
     }
+
+    /**
+     * Advanced View (CAP-005) factories. All three are created per navigation
+     * (History re-reads the store on every entry — refresh via per-navigation
+     * creation, design decision; Add/Edit are scoped to the current form/record).
+     */
+    fun historyViewModel(): HistoryViewModel =
+        HistoryViewModel(store = store, scope = scope)
+
+    fun addPastRecordViewModel(): AddPastRecordViewModel =
+        AddPastRecordViewModel(repository = repository, store = store, scope = scope)
+
+    fun editRecordViewModel(registro: RegistroComida): EditRecordViewModel =
+        EditRecordViewModel(store = store, scope = scope, registro = registro)
 
     private companion object {
         // Placeholder identity until a patient profile exists (CAP-001 scope).
