@@ -2,7 +2,10 @@ package com.diabecarekids.app.viewmodel
 
 import com.diabecarekids.app.domain.FoodItem
 import com.diabecarekids.app.domain.RegistroComida
+import com.diabecarekids.app.domain.UbicacionGps
 import com.diabecarekids.app.persistence.PersistenceStore
+import com.diabecarekids.app.platform.Haptics
+import com.diabecarekids.app.platform.LocationProvider
 import com.diabecarekids.app.platform.PhotoCapture
 import com.diabecarekids.app.platform.PostprandialAlarmScheduler
 import com.diabecarekids.app.nutrition.CarbResolution
@@ -72,3 +75,23 @@ class FakeAlarmScheduler : PostprandialAlarmScheduler {
     override fun schedule(mealId: String) { scheduled += mealId }
     override fun cancel(mealId: String) { cancelled += mealId }
 }
+
+/** [LocationProvider] stub. [result] controls what [currentLocation] returns (null = denied/unavailable). */
+class FakeLocationProvider(var result: UbicacionGps? = null) : LocationProvider {
+    var calls = 0
+    override suspend fun currentLocation(): UbicacionGps? {
+        calls++
+        return result
+    }
+}
+
+/** [Haptics] recording stub. */
+class FakeHaptics : Haptics {
+    var vibrated = false
+    var calls = 0
+    override fun vibrateSosTriggered() {
+        vibrated = true
+        calls++
+    }
+}
+
