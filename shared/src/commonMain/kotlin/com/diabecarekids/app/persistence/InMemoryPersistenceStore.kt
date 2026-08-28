@@ -30,4 +30,7 @@ class InMemoryPersistenceStore : PersistenceStore {
     override suspend fun delete(id: String) {
         mutex.withLock { records.remove(id) }
     }
+
+    override suspend fun getAll(): List<RegistroComida> =
+        mutex.withLock { records.values.toList() }
 }
