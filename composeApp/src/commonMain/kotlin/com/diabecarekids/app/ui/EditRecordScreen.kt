@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalMaterial3Api::class)
+
 package com.diabecarekids.app.ui
 
 import androidx.compose.foundation.layout.Arrangement
@@ -8,10 +10,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
@@ -23,31 +28,44 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.diabecarekids.app.format.formatEpochMillis
 import com.diabecarekids.app.format.formatGrams
-import com.diabecarekids.app.viewmodel.FollowUpViewModel
+import com.diabecarekids.app.viewmodel.EditRecordViewModel
 
 /**
- * T2 postprandial follow-up: intake % slider, 2h blood glucose, a live real-carbs
- * preview (REQ-MEAL-003), and an optional after photo (INV-005). On save the
- * existing meal record is updated; [onDone] returns to the T0 form.
+ * Edit existing historical record (CAP-005, R3): carb estimate, consumed % and
+ * 2h postprandial BG, with a live recalculated real-carbs preview (FollowUpScreen
+ * pattern). Saving persists via [EditRecordViewModel.update] then signals
+ * [EditRecordViewModel.updated] and the screen returns to History via [onSaved].
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FollowUpScreen(
-    viewModel: FollowUpViewModel,
-    onDone: () -> Unit,
+fun EditRecordScreen(
+    viewModel: EditRecordViewModel,
+    onBack: () -> Unit,
+    onSaved: () -> Unit,
 ) {
     val state by viewModel.state.collectAsState()
-    val completed by viewModel.completed.collectAsState()
+    val updated by viewModel.updated.collectAsState()
 
-    LaunchedEffect(completed) {
-        completed?.let {
-            viewModel.onCompletedConsumed()
-            onDone()
+    LaunchedEffect(updated) {
+        updated?.let {
+            viewModel.onUpdatedConsumed()
+            onSaved()
         }
     }
 
-    Scaffold(topBar = { TopAppBar(title = { Text("Seguimiento postprandial (T2)") }) }) { padding ->
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Editar registro") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
+                    }
+                },
+            )
+        },
+    ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -57,11 +75,22 @@ fun FollowUpScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(state.registro.nombre_alimento, style = MaterialTheme.typography.titleMedium)
+            Text(
+                "Tipo: ${state.registro.tipo_comida.name} · ${formatEpochMillis(state.registro.fecha_hora_inicio)}",
+                style = MaterialTheme.typography.labelMedium,
+            )
 
-            Text("Porcentaje consumido: ${state.intakePercent}%")
+            OutlinedTextField(
+                value = state.carbInput,
+                onValueChange = viewModel::onCarbInputChange,
+                label = { Text("Carbohidratos (g)") },
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            Text("Porcentaje consumido: ${state.consumedPercent}%")
             Slider(
-                value = state.intakePercent.toFloat(),
-                onValueChange = { viewModel.onIntakePercentChange(it.toInt()) },
+                value = state.consumedPercent.toFloat(),
+                onValueChange = { viewModel.onConsumedPercentChange(it.toInt()) },
                 valueRange = 0f..100f,
                 steps = 19,
                 modifier = Modifier.fillMaxWidth(),
@@ -78,13 +107,6 @@ fun FollowUpScreen(
                 "Carbohidratos reales: ${formatGrams(state.realCarbsPreview)} g",
                 style = MaterialTheme.typography.titleMedium,
             )
-
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = viewModel::takePhoto) {
-                    Text(if (state.photoUri != null) "Cambiar foto" else "Agregar foto")
-                }
-                if (state.photoUri != null) Text("Foto capturada")
-            }
 
             state.error?.let { err ->
                 Text(err, color = MaterialTheme.colorScheme.error)

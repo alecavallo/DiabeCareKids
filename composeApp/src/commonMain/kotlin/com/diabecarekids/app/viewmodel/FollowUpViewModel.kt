@@ -5,7 +5,7 @@ import com.diabecarekids.app.domain.calcularCarbohidratosReales
 import com.diabecarekids.app.persistence.PersistenceStore
 import com.diabecarekids.app.platform.PhotoCapture
 import com.diabecarekids.app.platform.PostprandialAlarmScheduler
-import com.diabecarekids.app.platform.epochMillisNow
+import com.diabecarekids.app.platform.wallClockAsUtcEpochNow
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -92,7 +92,8 @@ class FollowUpViewModel(
         }
         _state.update { it.copy(isSaving = true, error = null) }
         scope.launch {
-            val now = epochMillisNow()
+            // Wall-clock-as-UTC (ID-TZ), consistent with the meal timestamp convention.
+            val now = wallClockAsUtcEpochNow()
             val updated = s.registro.copy(
                 porcentaje_consumido = s.intakePercent,
                 carbohidratos_reales = calcularCarbohidratosReales(s.registro.carbohidratos_estimados, s.intakePercent),
