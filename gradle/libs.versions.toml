@@ -14,6 +14,9 @@ ktor = "3.0.3"
 kotlinx-serialization = "1.7.3"
 coroutines = "1.9.0"
 androidx-work = "2.9.1"
+# Fused location for the SOS alert (CAP-001 / REQ-SOS-003). Play-services-location
+# 21.3.0 requires compileSdk 34, which this project already targets.
+play-services-location = "21.3.0"
 
 [libraries]
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "androidx-activity" }
@@ -30,6 +33,7 @@ coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", ve
 coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }
 # Android-only (used by composeApp in Slice 2); pinned here in Slice 1 per catalog.
 work-runtime-ktx = { module = "androidx.work:work-runtime-ktx", version.ref = "androidx-work" }
+play-services-location = { module = "com.google.android.gms:play-services-location", version.ref = "play-services-location" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }
