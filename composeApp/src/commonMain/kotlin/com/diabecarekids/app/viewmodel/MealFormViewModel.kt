@@ -9,7 +9,7 @@ import com.diabecarekids.app.platform.PhotoCapture
 import com.diabecarekids.app.platform.PostprandialAlarmScheduler
 import com.diabecarekids.app.nutrition.CarbResolution
 import com.diabecarekids.app.nutrition.NutritionRepository
-import com.diabecarekids.app.platform.epochMillisNow
+import com.diabecarekids.app.platform.wallClockAsUtcEpochNow
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -186,7 +186,10 @@ class MealFormViewModel(
         }
         _state.update { it.copy(isSaving = true, error = null) }
         scope.launch {
-            val now = epochMillisNow()
+            // Wall-clock-as-UTC (ID-TZ): store the local wall clock interpreted as
+            // UTC so the shared formatter renders the user's local time without a
+            // timezone offset, consistent with advanced-history / PDF handling.
+            val now = wallClockAsUtcEpochNow()
             val registro = newRegistro(query, carbs, bg, now)
             store.save(registro)
             alarmScheduler.schedule(registro.id)

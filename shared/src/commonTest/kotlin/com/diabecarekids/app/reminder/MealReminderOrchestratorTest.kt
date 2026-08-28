@@ -40,6 +40,9 @@ class MealReminderOrchestratorTest {
         val engine = ReminderScheduleEngine(
             now = { nowMin * 60_000 },
             todayAt = { it.hour * 60L * 60_000 + it.minute * 60_000 },
+            dayAt = { time, offset ->
+                (time.hour * 60L + time.minute + offset * 1440L) * 60_000
+            },
         )
         val scheduler = FakeMealReminderScheduler()
         val orchestrator = MealReminderOrchestrator(engine, horariosStore, recentCheck, scheduler)
@@ -101,6 +104,24 @@ class MealReminderOrchestratorTest {
         orchestrator.refresh()
 
         assertTrue(scheduler.scheduled.none { it.first == TipoComida.ALMUERZO })
+        assertEquals(0, scheduler.cancelAllCalls)
+    }
+
+    // --- ID-REARM: a meal already past at app-open is re-armed for tomorrow ---
+
+    @Test
+    fun missedMealRearmsForTomorrow() = runTest {
+        // Now 13:20 → ALMUERZO trigger 12:15 is past the 60-min grace (13:15) → MISSED;
+        // the orchestrator must schedule tomorrow's ALMUERZO trigger so reminders keep
+        // firing day-after-day without reopening the app (ID-REARM).
+        val (orchestrator, scheduler) = orchestrator(nowMin = minute(13, 20), config = defaultConfig, recentCheck = noRecent())
+
+        orchestrator.refresh()
+
+        val expectedAlmuerzo = (minute(12, 15) + 1440) * 60_000
+        assertTrue((TipoComida.ALMUERZO to expectedAlmuerzo) in scheduler.scheduled)
+        // Meals still ahead today are scheduled for today (not tomorrow).
+        assertTrue((TipoComida.CENA to minute(20, 45) * 60_000) in scheduler.scheduled)
         assertEquals(0, scheduler.cancelAllCalls)
     }
 }

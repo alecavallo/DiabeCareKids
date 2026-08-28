@@ -12,6 +12,7 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
+        android:name=".DiabeCareApp"
         android:allowBackup="true"
         android:label="DiabeCareKids"
         android:supportsRtl="true"

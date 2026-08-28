@@ -3,8 +3,9 @@ package com.diabecarekids.app.alarm
 import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
-import com.diabecarekids.app.domain.ReminderDecision
 import com.diabecarekids.app.domain.TipoComida
+import com.diabecarekids.app.reminder.MealReminderRun
+import com.diabecarekids.app.reminder.MealReminderRunner
 
 /**
  * Executes a scheduled meal reminder (design D6).
@@ -13,9 +14,20 @@ import com.diabecarekids.app.domain.TipoComida
  * [MealReminderDependencies] and re-runs the shared engine's
  * [com.diabecarekids.app.domain.ReminderScheduleEngine.evaluateFor] against the
  * CURRENT time. This execution-time re-check satisfies Post-Logging Suppression
- * — if the user has since logged the meal within the 2h window the decision is
- * [ReminderDecision.Suppressed] and no notification is shown. Only a
- * [ReminderDecision.Fire] produces a local notification.
+ * — if the user has since logged the meal within the window the decision is
+ * suppressed and no notification is shown. Only a Fire produces a local
+ * notification.
+ *
+ * After handling the current occurrence it RE-ARMS the reminder for the next day
+ * (ID-REARM), so reminders keep firing day-after-day without the app being
+ * reopened. The decision logic lives in the platform-free [MealReminderRunner]
+ * (testable in commonTest); this class only adapts the WorkManager seam to it.
+ *
+ * Graceful degradation (ID-WORKER-CRASH): WorkManager can start this process
+ * directly (device reboot / process killed while backgrounded) with no Activity.
+ * [Application.onCreate] ([DiabeCareApp]) populates [MealReminderDependencies]
+ * before any worker runs; if it is ever still unpopulated the worker skips
+ * (Result.success) instead of throwing and losing the reminder silently.
  */
 class MealScheduleReminderWorker(
     context: Context,
@@ -28,13 +40,24 @@ class MealScheduleReminderWorker(
             ?: return Result.failure()
 
         val deps = MealReminderDependencies
-        val config = deps.horariosStore().load()
-        val decision = deps.engine().evaluateFor(tipo, config, deps.recentCheck())
+        // Graceful skip: never throw when the composition root never ran.
+        if (!deps.isPopulated) return Result.success()
 
-        if (decision is ReminderDecision.Fire) {
-            deps.notifier().showReminder(tipo)
+        val runner = MealReminderRunner(
+            engine = deps.engine(),
+            loadConfig = { deps.horariosStore().load() },
+            recentCheck = deps.recentCheck(),
+            showReminder = { deps.notifier().showReminder(it) },
+        )
+
+        when (val run = runner.run(tipo)) {
+            MealReminderRun.Skip -> Unit
+            is MealReminderRun.Rearm -> {
+                // Daily re-arm (ID-REARM): schedule the next occurrence so the chain
+                // continues without MainActivity / orchestrator.refresh().
+                WorkManagerMealReminderScheduler(applicationContext).schedule(tipo, run.nextTriggerAt)
+            }
         }
-        // Suppressed / Missed / Schedule are intentionally no-ops at execution time.
         return Result.success()
     }
 }

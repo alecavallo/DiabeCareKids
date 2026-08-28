@@ -8,7 +8,8 @@ import androidx.work.WorkManager
 import androidx.work.workDataOf
 import com.diabecarekids.app.domain.TipoComida
 import com.diabecarekids.app.platform.MealReminderScheduler
-import com.diabecarekids.app.platform.epochMillisNow
+import com.diabecarekids.app.platform.reminderDelayMillis
+import com.diabecarekids.app.platform.wallClockAsUtcOffsetAtWallTimeMillis
 import java.util.concurrent.TimeUnit
 
 /**
@@ -26,7 +27,18 @@ class WorkManagerMealReminderScheduler(
 ) : MealReminderScheduler {
 
     override fun schedule(tipo: TipoComida, triggerAt: Long) {
-        val delayMillis = (triggerAt - epochMillisNow()).coerceAtLeast(0L)
+        // triggerAt is on the wall-clock-as-UTC axis (ID-TZ-TIMELINE). WorkManager's
+        // setInitialDelay is REAL ELAPSED time (System.currentTimeMillis axis), so the
+        // delay must be the true-UTC span between now and the trigger, not the nominal
+        // wall-clock span. We convert the trigger to its true-UTC epoch using the device
+        // offset at the trigger's OWN wall time (DST-aware) — across a spring-forward /
+        // fall-back transition that offset differs from the current one, and only the
+        // trigger-time offset keeps the delay real-elapsed correct (ID-DST-DELAY).
+        val delayMillis = reminderDelayMillis(
+            triggerAt = triggerAt,
+            triggerUtcOffsetMillis = wallClockAsUtcOffsetAtWallTimeMillis(triggerAt),
+            realNowMillis = System.currentTimeMillis(),
+        )
         val request = OneTimeWorkRequestBuilder<MealScheduleReminderWorker>()
             .setInitialDelay(delayMillis, TimeUnit.MILLISECONDS)
             .setInputData(workDataOf(KEY_MEAL_TYPE to tipo.name))

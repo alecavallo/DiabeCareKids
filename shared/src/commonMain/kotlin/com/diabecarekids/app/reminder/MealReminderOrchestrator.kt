@@ -13,7 +13,9 @@ import com.diabecarekids.app.platform.MealReminderScheduler
  * decisions to scheduler calls:
  *  - [ReminderDecision.Disabled]  → [MealReminderScheduler.cancelAll]
  *  - [ReminderDecision.Schedule] / [ReminderDecision.Fire] → schedule at trigger
- *  - [ReminderDecision.Suppressed] / [ReminderDecision.Missed] → no-op
+ *  - [ReminderDecision.Missed] → schedule the NEXT day's trigger (daily re-arm,
+ *    ID-REARM — a meal already past at app-open still gets scheduled tomorrow)
+ *  - [ReminderDecision.Suppressed] → no-op
  */
 class MealReminderOrchestrator(
     private val engine: ReminderScheduleEngine,
@@ -34,8 +36,9 @@ class MealReminderOrchestrator(
             when (decision) {
                 is ReminderDecision.Schedule -> scheduler.schedule(decision.mealType, decision.triggerAt)
                 is ReminderDecision.Fire -> scheduler.schedule(decision.mealType, decision.triggerAt)
+                is ReminderDecision.Missed ->
+                    scheduler.schedule(decision.mealType, engine.nextTriggerAt(decision.mealType, config))
                 is ReminderDecision.Suppressed -> Unit
-                is ReminderDecision.Missed -> Unit
                 ReminderDecision.Disabled -> Unit
             }
         }
