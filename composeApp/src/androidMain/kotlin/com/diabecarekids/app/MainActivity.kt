@@ -22,9 +22,10 @@ import com.diabecarekids.app.persistence.InMemoryHorariosStore
 import com.diabecarekids.app.persistence.InMemoryPersistenceStore
 import com.diabecarekids.app.persistence.PersistenceRecentRecordWindowCheck
 import com.diabecarekids.app.photocapture.TakePicturePhotoCapture
-import com.diabecarekids.app.platform.epochMillisNow
 import com.diabecarekids.app.platform.httpClientEngine
+import com.diabecarekids.app.platform.localTimeAtDayOffsetMillis
 import com.diabecarekids.app.platform.todayAtLocalTimeMillis
+import com.diabecarekids.app.platform.wallClockAsUtcEpochNow
 import com.diabecarekids.app.reminder.MealReminderOrchestrator
 import com.diabecarekids.app.sos.AndroidHaptics
 import com.diabecarekids.app.sos.FusedLocationProvider
@@ -94,8 +95,14 @@ class MainActivity : ComponentActivity() {
         val horariosStore = InMemoryHorariosStore()
         val recentCheck = PersistenceRecentRecordWindowCheck(store)
         val engine = ReminderScheduleEngine(
-            now = { epochMillisNow() },
+            // now on the wall-clock-as-UTC axis (ID-TZ-TIMELINE): matches how live
+            // records are stored (wallClockAsUtcEpochNow) so the suppression window's
+            // current bound and the stored fecha_hora_inicio are on the same axis.
+            now = { wallClockAsUtcEpochNow() },
             todayAt = { time: LocalTimeOfDay -> todayAtLocalTimeMillis(time.hour, time.minute) },
+            dayAt = { time: LocalTimeOfDay, offset: Int ->
+                localTimeAtDayOffsetMillis(time.hour, time.minute, offset)
+            },
         )
         val mealScheduler = WorkManagerMealReminderScheduler(applicationContext)
         val notifier = MealReminderNotifier(applicationContext)
