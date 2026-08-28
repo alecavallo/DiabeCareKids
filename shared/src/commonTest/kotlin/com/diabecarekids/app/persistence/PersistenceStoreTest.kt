@@ -83,4 +83,21 @@ class PersistenceStoreTest {
 
         assertEquals(null, store.get("meal-9")?.foto_antes_url)
     }
+
+    @Test
+    fun getAllReturnsAllSavedRecords() = runTest {
+        val store = InMemoryPersistenceStore()
+        store.save(registro("meal-1"))
+        store.save(registro("meal-2"))
+
+        val all = store.getAll()
+
+        assertEquals(setOf("meal-1", "meal-2"), all.map { it.id }.toSet())
+    }
+
+    @Test
+    fun getAllIsEmptyForNewStore() = runTest {
+        val store = InMemoryPersistenceStore()
+        assertEquals(0, store.getAll().size)
+    }
 }
